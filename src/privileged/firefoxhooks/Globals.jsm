@@ -10,6 +10,8 @@
 
 const GLOBAL = this;
 
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+
 Cu.importGlobalProperties(["fetch", "FileReader"]);
 
 ChromeUtils.defineModuleGetter(this, "AddonManager",
@@ -17,6 +19,10 @@ ChromeUtils.defineModuleGetter(this, "AddonManager",
 ChromeUtils.defineModuleGetter(this, "AppConstants",
                                "resource://gre/modules/AppConstants.jsm");
 
+Services.scriptloader.loadSubScript(
+  gExtension.getURL("privileged/firefoxhooks/EveryWindow.jsm"), GLOBAL);
+Services.scriptloader.loadSubScript(
+  gExtension.getURL("privileged/firefoxhooks/PanelUI.jsm"), GLOBAL);
 Services.scriptloader.loadSubScript(
   gExtension.getURL("privileged/firefoxhooks/FirefoxHooks.jsm"), GLOBAL);
 Services.scriptloader.loadSubScript(

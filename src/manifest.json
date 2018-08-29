@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "CHANGE ME",
+  "name": "Popup Notifications Experiment",
   "version": "1.0",
   "description": "CHANGE ME",
   "background": {
@@ -8,7 +8,7 @@
   },
   "applications": {
     "gecko": {
-      "id": "CHANGE_ME@shield.mozilla.org",
+      "id": "pnexperiment@shield.mozilla.org",
       "strict_min_version": "61.0"
     }
   },

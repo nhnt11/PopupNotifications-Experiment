@@ -1,0 +1,7 @@
+#pnexperiment-notification-anchor .pnexperiment-icon {
+  list-style-image: url(chrome://browser/skin/warning.svg);
+}
+
+#pnexperiment-notification-anchor {
+  display: block;
+}
