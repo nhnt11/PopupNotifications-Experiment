@@ -39,7 +39,6 @@ module.exports = {
     "mozilla/no-useless-removeEventListener": "off",
 
     "comma-dangle": ["error", "always-multiline"],
-    "eqeqeq": "error",
     "indent": ["warn", 2, { SwitchCase: 1 }],
     "max-len": [
       "warn",

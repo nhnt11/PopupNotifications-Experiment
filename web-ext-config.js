@@ -12,8 +12,9 @@ const defaultConfig = {
   run: {
     firefox: process.env.FIREFOX_BINARY || "firefox",
     browserConsole: false,
-    startUrl: ["about:debugging"],
-    pref: ["extensions.pnexperiment.enabled=true"],
+    startUrl: ["vodafone.de"],
+    pref: ["extensions.pnexperiment.enabled=true",
+      "browser.translation.detectLanguage=true"],
   },
 };
 

@@ -1,3 +1,5 @@
+/* globals AppConstants, AddonManager, Experiment, Services, XPCOMUtils, gExtension, FirefoxHooks */
+
 this.FirefoxHooks = {
   init() {
     AddonManager.addAddonListener(this);
@@ -33,10 +35,10 @@ this.FirefoxHooks = {
       return;
     }
 
-    let blob = await response.blob();
-    let reader  = new FileReader();
+    const blob = await response.blob();
+    const reader  = new FileReader();
 
-    let dataURI = await new Promise((resolve, reject) => {
+    const dataURI = await new Promise((resolve, reject) => {
       reader.addEventListener("load", () => {
         resolve(reader.result);
       }, { once: true });
@@ -88,7 +90,7 @@ this.FirefoxHooks = {
       payload = { payload };
     }
 
-    for (let cb of this.eventListeners) {
+    for (const cb of this.eventListeners) {
       await cb(payload);
     }
   },

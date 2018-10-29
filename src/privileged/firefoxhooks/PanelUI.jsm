@@ -3,23 +3,49 @@
 function PanelUI(doc) {
   this.doc = doc;
 
-  let box = doc.createElementNS(XUL_NS, "vbox");
+  const box = doc.createElementNS(XUL_NS, "vbox");
 
-  let elt;
+  const headerElt = doc.createElementNS(XUL_NS, "description");
+  headerElt.textContent = this.getString("pnexperiment.popupHeader");
+  headerElt.classList.add("headerText");
+  box.appendChild(headerElt);
 
-  elt = doc.createElementNS(XUL_NS, "description");
-  elt.textContent = this.getString("pnexperiment.popupHeader");
-  elt.classList.add("headerText");
-  box.appendChild(elt);
+  function makeLanguageList(aId, aLangList, aLabelText, aSelectLang) {
+    const menulist = doc.createElementNS(XUL_NS, "menulist");
+    menulist.setAttribute("id", `pnexperiment-${aId}-menulist`);
+    const menupopup = doc.createElementNS(XUL_NS, "menupopup");
+    menupopup.setAttribute("id", `pnexperiment-${aId}-menupopup`);
+    menulist.appendChild(menupopup);
 
-  elt = doc.createElementNS(XUL_NS, "description");
-  elt.classList.add("popupText");
-  box.appendChild(elt);
+    for (const lang of aLangList) {
+      const menuitem = doc.createElementNS(XUL_NS, "menuitem");
+      menuitem.setAttribute("value", lang);
+      menuitem.setAttribute("label", Services.intl.getLanguageDisplayNames(undefined, [lang])[0]);
+      menupopup.appendChild(menuitem);
+    }
+
+    const menulistLabel = doc.createElementNS(XUL_NS, "label");
+    menulistLabel.setAttribute("value", aLabelText);
+    menulistLabel.setAttribute("control", menulist.id);
+    box.appendChild(menulistLabel);
+    box.appendChild(menulist);
+
+    return menulist;
+  }
+
+  makeLanguageList("sourceLang", this.kSupportedSourceLanguages,
+    this.getString("pnexperiment.popupText.detectedLanguage"));
+
+  makeLanguageList("targetLang", this.kSupportedTargetLanguages,
+    this.getString("pnexperiment.popupText.targetLanguage"));
 
   this.box = box;
 }
 
 PanelUI.prototype = {
+  kSupportedSourceLanguages: ["bg", "cs", "de", "en", "es", "fr", "ja", "ko", "nl", "no", "pl", "pt", "ru", "tr", "vi", "zh"],
+  kSupportedTargetLanguages: ["bg", "cs", "de", "en", "es", "fr", "ja", "ko", "nl", "no", "pl", "pt", "ru", "tr", "vi", "zh"],
+
   get PNUtils() {
     // Set on every window by Experiment.jsm for PanelUI to use.
     // Because sharing is caring.
@@ -66,8 +92,10 @@ PanelUI.prototype = {
     ];
   },
 
-  refresh() {
-    let elt = this.box.querySelector(".popupText");
-    elt.textContent = this.getString("pnexperiment.popupText");
+  refresh(aSourceLang, aTargetLang) {
+    this.doc.getElementById("pnexperiment-sourceLang-menulist")
+      .selectedIndex = this.kSupportedSourceLanguages.indexOf(aSourceLang);
+    this.doc.getElementById("pnexperiment-targetLang-menulist")
+      .selectedIndex = this.kSupportedTargetLanguages.indexOf(aTargetLang);
   },
 };

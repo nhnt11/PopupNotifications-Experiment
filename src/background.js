@@ -1,4 +1,4 @@
-let gEventListener = async function(payload) {
+const gEventListener = async function(payload) {
   console.log(payload);
   //  browser.study.sendTelemetry(payload);
 };

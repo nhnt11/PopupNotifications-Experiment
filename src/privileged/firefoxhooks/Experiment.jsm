@@ -1,3 +1,5 @@
+/* globals XUL_NS, PanelUI, Services, EveryWindow, XPCOMUtils, Preferences, gExtension, FirefoxHooks */
+
 this.Experiment = {
   // This is here for documentation, will be redefined to a pref getter
   // using XPCOMUtils.defineLazyPreferenceGetter in init().
@@ -5,6 +7,9 @@ this.Experiment = {
   kEnabledPref: "extensions.pnexperiment.enabled",
 
   kNotificationID: "pnexperiment",
+  get kNotificationAnchorID() {
+    return `${this.kNotificationID}-notification-anchor`;
+  },
 
   async setup() {
     // Called the first time the study is setup - so only once.
@@ -52,25 +57,6 @@ this.Experiment = {
     Preferences.set(this.kEnabledPref, false);
   },
 
-  // nsIWebProgressListener implementation.
-  onStateChange(aBrowser, aWebProgress, aRequest, aStateFlags, aStatus) {
-    if (!aWebProgress.isTopLevel || aWebProgress.isLoadingDocument ||
-        !Components.isSuccessCode(aStatus)) {
-      return;
-    }
-
-    let host;
-    try {
-      host = Services.eTLD.getBaseDomain(aRequest.URI);
-    } catch (e) {
-      // If we can't get the host for the URL, it's not one we
-      // care about for breach alerts anyway.
-      return;
-    }
-
-    this.popupIfNeeded(aBrowser, host);
-  },
-
   async startObserving() {
     if (this.observerAdded) {
       return;
@@ -84,10 +70,11 @@ this.Experiment = {
         if (!DOMWindowUtils) {
           // win.windowUtils was added in 63, fallback if it's not available.
           DOMWindowUtils = win.QueryInterface(Ci.nsIInterfaceRequestor)
-                              .getInterface(Ci.nsIDOMWindowUtils);
+            .getInterface(Ci.nsIDOMWindowUtils);
         }
-        DOMWindowUtils.loadSheetUsingURIString(gExtension.getURL("privileged/firefoxhooks/styles.css"),
-                                               DOMWindowUtils.AUTHOR_SHEET);
+        DOMWindowUtils.loadSheetUsingURIString(
+          gExtension.getURL("privileged/firefoxhooks/styles.css"),
+          DOMWindowUtils.AUTHOR_SHEET);
 
         // Set up some helper functions on the window object
         // for the popup notification to use.
@@ -105,29 +92,26 @@ this.Experiment = {
           getFormattedString: (aKey, args) => {
             return this.getFormattedString(aKey, args);
           },
+          getDefaultTargetLanguage: () => {
+            return this.defaultTargetLanguage;
+          },
         };
 
         // Setup the popup notification stuff. First, the URL bar icon:
-        let doc = win.document;
-        let box = doc.getElementById("page-action-buttons");
-        // We create a box to use as the anchor, and put an icon image
-        // inside it. This way, when we animate the icon, its scale change
-        // does not cause the popup notification to bounce due to the anchor
-        // point moving.
-        let box2 = doc.createElementNS(XUL_NS, "box");
-        box2.setAttribute("id", `${this.kNotificationID}-notification-anchor`);
-        box2.classList.add("notification-anchor-icon");
-        let img = doc.createElementNS(XUL_NS, "image");
+        const doc = win.document;
+        const pageActionBox = doc.getElementById("page-action-buttons");
+        const pageActionButton = doc.getElementById("pageActionButton");
+        const img = doc.createElementNS(XUL_NS, "image");
         img.setAttribute("role", "button");
-        img.classList.add(`${this.kNotificationID}-icon`);
-        box2.appendChild(img);
-        box.appendChild(box2);
+        img.setAttribute("id", `${this.kNotificationAnchorID}`);
+        img.classList.add(`${this.kNotificationID}-icon`, "urlbar-icon");
+        pageActionBox.insertBefore(img, pageActionButton.nextSibling);
 
         // Now, the popupnotificationcontent:
-        let parentElt = doc.defaultView.PopupNotifications.panel.parentNode;
-        let pn = doc.createElementNS(XUL_NS, "popupnotification");
-        let pnContent = doc.createElementNS(XUL_NS, "popupnotificationcontent");
-        let panelUI = new PanelUI(doc);
+        const parentElt = doc.defaultView.PopupNotifications.panel.parentNode;
+        const pn = doc.createElementNS(XUL_NS, "popupnotification");
+        const pnContent = doc.createElementNS(XUL_NS, "popupnotificationcontent");
+        const panelUI = new PanelUI(doc, this.defaultTargetLanguage);
         pnContent.appendChild(panelUI.box);
         pn.appendChild(pnContent);
         pn.setAttribute("id", `${this.kNotificationID}-notification`);
@@ -136,7 +120,8 @@ this.Experiment = {
         win.PNPanelUI = panelUI;
 
         // Start listening across all tabs!
-        win.gBrowser.addTabsProgressListener(this);
+        win.addEventListener("TabSelect", this);
+        win.messageManager.addMessageListener("Translation:DocumentState", this);
       },
       (win) => {
         // If the window is being destroyed and gBrowser no longer exists,
@@ -149,21 +134,23 @@ this.Experiment = {
         if (!DOMWindowUtils) {
           // win.windowUtils was added in 63, fallback if it's not available.
           DOMWindowUtils = win.QueryInterface(Ci.nsIInterfaceRequestor)
-                              .getInterface(Ci.nsIDOMWindowUtils);
+            .getInterface(Ci.nsIDOMWindowUtils);
         }
-        DOMWindowUtils.removeSheetUsingURIString(gExtension.getURL("privileged/firefoxhooks/styles.css"),
-                                                 DOMWindowUtils.AUTHOR_SHEET);
+        DOMWindowUtils.removeSheetUsingURIString(
+          gExtension.getURL("privileged/firefoxhooks/styles.css"),
+          DOMWindowUtils.AUTHOR_SHEET);
 
-      win.PNUtils.notifications.forEach(n => {
+        win.PNUtils.notifications.forEach(n => {
           n.remove();
         });
         delete win.PNUtils;
 
-        let doc = win.document;
-        doc.getElementById(`${this.kNotificationID}-notification-anchor`).remove();
+        const doc = win.document;
+        doc.getElementById(`${this.kNotificationAnchorID}`).remove();
         doc.getElementById(`${this.kNotificationID}-notification`).remove();
         delete win.PNPanelUI;
 
+        win.removeEventListener("TabSelect", this);
         win.gBrowser.removeTabsProgressListener(this);
       },
     );
@@ -181,38 +168,68 @@ this.Experiment = {
     this.observerAdded = false;
   },
 
-  popupIfNeeded(browser, host) {
-    if (!this.enabled) {
+  handleEvent(event) {
+    if (event.type != "TabSelect" ||
+        event.target.linkedBrowser[`${this.kNotificationAnchorID}popupnotificationanchor`]) {
       return;
     }
 
-    let doc = browser.ownerDocument;
-    let win = doc.defaultView;
-    let panelUI = doc.defaultView.PNPanelUI;
+    event.target.ownerDocument.getElementById(`${this.kNotificationAnchorID}`).removeAttribute("showing");
+  },
 
-    let populatePanel = (event) => {
+  receiveMessage(aMessage) {
+    this.popupIfNeeded(aMessage.target, aMessage.data.detectedLanguage);
+  },
+
+  get defaultTargetLanguage() {
+    if (this._defaultTargetLanguage) {
+      return this._defaultTargetLanguage;
+    }
+
+    return this._defaultTargetLanguage =
+      Services.locale.getAppLocaleAsLangTag().split("-")[0];
+  },
+
+  popupIfNeeded(browser, language) {
+    if (!this.enabled || language == this.defaultTargetLanguage) {
+      return;
+    }
+
+    const doc = browser.ownerDocument;
+    const win = doc.defaultView;
+    const panelUI = doc.defaultView.PNPanelUI;
+
+    const populatePanel = (event) => {
       switch (event) {
         case "showing":
-          panelUI.refresh();
           break;
         case "shown":
+          panelUI.refresh(language, this.defaultTargetLanguage);
           break;
         case "removed":
+          //delete browser[`${this.kNotificationAnchorID}popupnotificationanchor`];
+          if (win.gBrowser.selectedBrowser == browser) {
+            doc.getElementById(this.kNotificationAnchorID).removeAttribute("showing");
+          }
           win.PNUtils.notifications.delete(
             win.PopupNotifications.getNotification(this.kNotificationID, browser));
           break;
       }
     };
 
-    browser[`${this.kNotificationID}-notification-anchorpopupnotificationanchor`] = doc.getElementById(`${this.kNotificationID}-notification-anchor`);
+    // An annoying line of code that is necessary to get
+    // PopupNotifications to detect our anchor element correctly
+    //browser[`${this.kNotificationAnchorID}popupnotificationanchor`] =
+    //  doc.getElementById(this.kNotificationAnchorID);
 
-    let n = win.PopupNotifications.show(
+    const n = win.PopupNotifications.show(
       browser, this.kNotificationID, "",
-      `${this.kNotificationID}-notification-anchor`,
+      this.kNotificationAnchorID,
       panelUI.primaryAction, panelUI.secondaryActions, {
         persistent: true,
         hideClose: true,
         eventCallback: populatePanel,
+        popupIconURL: "chrome://browser/skin/info.svg",
       }
     );
 

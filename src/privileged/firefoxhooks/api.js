@@ -1,11 +1,11 @@
 ChromeUtils.defineModuleGetter(this, "Services",
-                               "resource://gre/modules/Services.jsm");
+  "resource://gre/modules/Services.jsm");
 ChromeUtils.defineModuleGetter(this, "ExtensionCommon",
-                               "resource://gre/modules/ExtensionCommon.jsm");
+  "resource://gre/modules/ExtensionCommon.jsm");
 
 this.firefoxhooks = class extends ExtensionAPI {
   getAPI(context) {
-    let FirefoxHooksContainer = { gExtension: context.extension };
+    const FirefoxHooksContainer = { gExtension: context.extension };
     Services.scriptloader.loadSubScript(
       context.extension.getURL("privileged/firefoxhooks/Globals.jsm"),
       FirefoxHooksContainer);
@@ -20,7 +20,7 @@ this.firefoxhooks = class extends ExtensionAPI {
           context,
           "firefoxhooks.onEvent",
           (fire) => {
-            let listener = (payload) => {
+            const listener = (payload) => {
               fire.async(payload);
             };
 
